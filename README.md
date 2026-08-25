@@ -1,7 +1,12 @@
-# Interior Brand — WhatsApp AI Sales Agent
+# Commerce RAG Agent — WhatsApp sales assistant for a furniture brand
+
+> **Status (2026-08-25):** public snapshot (May 2026) of a client pilot. The
+> production version runs in a private repo with Langfuse cost tracing per agent;
+> the **38% token-cost cut (1,118 → 695 tokens/message)** below is the measured,
+> dated figure. Live products + dated evidence: [sherrybuilds.com](https://sherrybuilds.com).
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)
-![Claude](https://img.shields.io/badge/Claude_3.5_Haiku-via_OpenRouter-blueviolet?logo=anthropic)
+![Claude](https://img.shields.io/badge/Claude_Haiku-via_OpenRouter-blueviolet?logo=anthropic)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-1.5-orange)
 ![WhatsApp](https://img.shields.io/badge/WhatsApp_Cloud_API-Meta-25D366?logo=whatsapp&logoColor=white)
@@ -15,7 +20,7 @@ products using a hybrid RAG pipeline, and autonomously generates qualified sales
 
 ## Features
 
-- **Conversational AI** — Claude 3.5 Haiku answers product questions in English and German with strict tone and format rules
+- **Conversational AI** — Claude Haiku (3.5 in this snapshot, 4.5 now) answers product questions in English and German with strict tone and format rules
 - **Hybrid RAG** — keyword + semantic (ChromaDB) retrieval finds the right products even for vague queries
 - **Semantic caching** — 95% similarity threshold avoids redundant API calls; 38% reduction in token costs measured in production
 - **Lead generation** — automated scraper targets luxury residential market listings, scores and qualifies leads, and writes results to Google Sheets
@@ -65,7 +70,7 @@ property listing platforms → scraper.py → scorer.py → storage.py → Googl
 |---|---|---|
 | **Messaging** | Meta WhatsApp Cloud API (Graph v19.0) | Webhook + outbound messages |
 | **Web server** | FastAPI + Uvicorn | ASGI webhook server with rate limiting |
-| **AI model** | Claude 3.5 Haiku via OpenRouter | Conversational response generation |
+| **AI model** | Claude Haiku via OpenRouter (3.5 in this snapshot; retired 2026-07, now 4.5) | Conversational response generation |
 | **Vector DB** | ChromaDB (persistent) | Semantic product search |
 | **Embeddings** | `all-MiniLM-L6-v2` (sentence-transformers) | Encoding queries and products |
 | **Caching** | Custom semantic cache (cosine similarity) | 38% API cost reduction |
@@ -93,7 +98,7 @@ property listing platforms → scraper.py → scorer.py → storage.py → Googl
 ## Project Structure
 
 ```
-Interior-Bot-Ai/
+commerce-rag-agent/
 ├── agents/
 │   ├── whatsapp-sales/
 │   │   ├── bot.py              # Core AI logic: cache → RAG → LLM
@@ -127,8 +132,8 @@ Interior-Bot-Ai/
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/sherrybuilds-studio/Interior-Bot-Ai.git
-cd Interior-Bot-Ai
+git clone https://github.com/sherrybuilds-studio/commerce-rag-agent.git
+cd commerce-rag-agent
 pip install -r requirements.txt
 ```
 
@@ -192,7 +197,7 @@ See [.env.example](.env.example) for the full list. Key variables:
 
 ---
 
-## Evaluation
+## Evaluation (May 2026 run)
 
 The eval suite in `tests/eval.py` runs 10 gold-standard questions (English + German)
 and checks that the bot's responses contain expected keywords.
