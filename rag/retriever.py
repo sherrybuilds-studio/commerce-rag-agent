@@ -118,14 +118,15 @@ def retrieve(query: str, n_results: int = 3) -> list:
     """
     Hybrid search — keyword first, semantic fills the rest.
     If keyword finds exact matches, they go to the top.
-    Semantic search fills remaining slots.
+    Semantic search fills remaining slots. If it fails (index not built, model not
+    downloadable), the keyword matches are still returned.
     """
+    keyword_results = keyword_search(query)
     try:
-        keyword_results  = keyword_search(query)
         semantic_results = semantic_search(query, n_results)
     except Exception:
-        logger.exception("Retrieval failed")
-        return []
+        logger.exception("Semantic search failed, returning keyword matches only")
+        semantic_results = []
 
     seen  = set()
     final = []

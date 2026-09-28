@@ -76,3 +76,14 @@ def test_the_named_product_ranks_before_products_that_mention_it():
 def test_keyword_matches_are_whole_words():
     assert retriever.keyword_search("Hi") == []  # not a match for "white" or "hand-stitched"
     assert retriever.keyword_search("LUX-10") == []  # not a prefix match for LUX-101 to LUX-109
+
+
+def test_keyword_hits_survive_a_semantic_search_failure(monkeypatch):
+    def broken_semantic_search(query, n_results=3):
+        raise RuntimeError("Collection [products] does not exist")  # index not built yet
+
+    monkeypatch.setattr(retriever, "semantic_search", broken_semantic_search)
+
+    results = retriever.retrieve("Tell me about LUX-104.")
+
+    assert [r["id"] for r in results] == ["LUX-104"]
