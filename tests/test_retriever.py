@@ -48,3 +48,31 @@ def test_semantic_results_fill_up_to_n_results(semantic_returns):
     ]
     assert results[0]["id"] == "LUX-104"
     assert results[0]["source"] == "keyword"
+
+
+def test_sku_inside_a_sentence_is_a_keyword_hit(semantic_returns):
+    semantic_returns("Royal Oak Dining Set", "Heritage Sleigh Bed", "Milan Oval Dining Table")
+
+    results = retriever.retrieve("Tell me about LUX-104.")
+
+    assert results[0]["id"] == "LUX-104"
+    assert results[0]["source"] == "keyword"
+
+
+def test_product_name_inside_a_sentence_is_a_keyword_hit(semantic_returns):
+    semantic_returns("Royal Oak Dining Set")
+
+    results = retriever.retrieve("Is the Heritage Sleigh Bed available in oak?")
+
+    assert results[0]["id"] == "LUX-108"
+    assert results[0]["source"] == "keyword"
+
+
+def test_the_named_product_ranks_before_products_that_mention_it():
+    # LUX-108's description says it "pairs naturally with LUX-109".
+    assert [r["id"] for r in retriever.keyword_search("LUX-109")] == ["LUX-109", "LUX-108"]
+
+
+def test_keyword_matches_are_whole_words():
+    assert retriever.keyword_search("Hi") == []  # not a match for "white" or "hand-stitched"
+    assert retriever.keyword_search("LUX-10") == []  # not a prefix match for LUX-101 to LUX-109

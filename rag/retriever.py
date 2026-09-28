@@ -9,6 +9,8 @@ The embedding model and the ChromaDB collection load on first use, so importing 
 import json
 import logging
 import os
+import re
+import string
 from functools import lru_cache
 
 from rag.embeddings import get_model
@@ -31,14 +33,22 @@ def get_collection():
     return chromadb.PersistentClient(path=DB_PATH).get_collection("products")
 
 
+def _contains_words(text: str, phrase: str) -> bool:
+    """True when phrase occurs in text as whole words: "velvet" is in "velvet-lined", "hi" is not in "white"."""
+    return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None
+
+
 def keyword_search(query: str) -> list:
     """
     Exact keyword match against product fields.
-    Catches SKU codes (LUX-101), material names (Velvet),
-    and specific words semantic search might miss.
+    A product matches when the message names its SKU code (LUX-101) or its full product name anywhere,
+    or when the whole message is a word or phrase from its fields, such as a material name (Velvet).
+    Matching is on whole words and ignores case. Products the message names come first.
     """
-    query_lower = query.lower()
-    matches     = []
+    query_lower = " ".join(query.lower().split())
+    phrase      = query_lower.strip(string.punctuation + " ")
+    named       = []
+    mentioned   = []
 
     for p in ALL_PRODUCTS:
         searchable = " ".join([
@@ -51,20 +61,27 @@ def keyword_search(query: str) -> list:
             " ".join(p.get("finish_options", [])),
         ]).lower()
 
-        if query_lower in searchable:
-            matches.append({
-                "id":             p["id"],
-                "name":           p["name"],
-                "pricing_tier":   p.get("pricing_tier", "Luxury"),
-                "description":    p["description"],
-                "lead_time":      p.get("lead_time_weeks", "6-8"),
-                "wood_options":   p.get("wood_options", []),
-                "finish_options": p.get("finish_options", []),
-                "customizable":   p.get("customizable", False),
-                "source":         "keyword"
-            })
+        labels = (p.get("id", "").lower(), p.get("name", "").lower())
+        if any(label and _contains_words(query_lower, label) for label in labels):
+            bucket = named
+        elif len(phrase) >= 3 and _contains_words(searchable, phrase):
+            bucket = mentioned
+        else:
+            continue
 
-    return matches
+        bucket.append({
+            "id":             p["id"],
+            "name":           p["name"],
+            "pricing_tier":   p.get("pricing_tier", "Luxury"),
+            "description":    p["description"],
+            "lead_time":      p.get("lead_time_weeks", "6-8"),
+            "wood_options":   p.get("wood_options", []),
+            "finish_options": p.get("finish_options", []),
+            "customizable":   p.get("customizable", False),
+            "source":         "keyword"
+        })
+
+    return named + mentioned
 
 
 def semantic_search(query: str, n_results: int = 3) -> list:
