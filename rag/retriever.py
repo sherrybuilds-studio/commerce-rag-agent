@@ -2,14 +2,16 @@
 rag/retriever.py — Hybrid Search (Semantic + Keyword)
 Semantic search finds meaning, keyword search finds exact matches.
 Both combined = more accurate product retrieval.
+
+The embedding model and the ChromaDB collection load on first use, so importing this module is cheap.
 """
 
 import json
 import logging
 import os
+from functools import lru_cache
 
-import chromadb
-from sentence_transformers import SentenceTransformer
+from rag.embeddings import get_model
 
 _base         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH       = os.path.join(_base, "rag/chroma_db")
@@ -17,12 +19,16 @@ PRODUCTS_PATH = os.path.join(_base, "rag/knowledge_base/products.json")
 
 logger = logging.getLogger(__name__)
 
-model      = SentenceTransformer("all-MiniLM-L6-v2")
-client     = chromadb.PersistentClient(path=DB_PATH)
-collection = client.get_collection("products")
-
 with open(PRODUCTS_PATH, "r") as f:
     ALL_PRODUCTS = json.load(f)
+
+
+@lru_cache(maxsize=1)
+def get_collection():
+    """The collection built by rag/indexer.py. Raises until the index exists."""
+    import chromadb
+
+    return chromadb.PersistentClient(path=DB_PATH).get_collection("products")
 
 
 def keyword_search(query: str) -> list:
@@ -66,8 +72,8 @@ def semantic_search(query: str, n_results: int = 3) -> list:
     Vector similarity search using ChromaDB.
     Finds products by meaning even if exact words do not match.
     """
-    embedding = model.encode([query]).tolist()
-    results   = collection.query(
+    embedding = get_model().encode([query]).tolist()
+    results   = get_collection().query(
         query_embeddings=embedding,
         n_results=n_results
     )
