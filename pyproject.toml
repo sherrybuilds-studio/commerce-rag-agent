@@ -1,0 +1,9 @@
+# Tool settings only. The code runs from a checkout and is not packaged.
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
