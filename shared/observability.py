@@ -1,26 +1,58 @@
+"""
+shared/observability.py: optional Langfuse tracing.
+
+Tracing is on only when LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_BASE_URL are all set.
+Otherwise every function here is a no-op, so the bot starts and answers without a Langfuse account.
+"""
+
+import logging
 import os
 from contextlib import contextmanager
 
-from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
 
-load_dotenv()
-
-_REQUIRED_KEYS = ["LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL"]
-_missing = [k for k in _REQUIRED_KEYS if not os.getenv(k)]
-if _missing:
-    raise RuntimeError(
-        f"Missing Langfuse env vars: {', '.join(_missing)}. "
-        "Set them in .env before starting the bot."
-    )
-
-from langfuse import Langfuse
+LANGFUSE_ENV_VARS = ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL")
 
 _client = None
+_warned_partial_config = False
+
+
+class _NoOpObservation:
+    """Stands in for a Langfuse trace, span or generation while tracing is off."""
+
+    def span(self, **kwargs):
+        return self
+
+    def generation(self, **kwargs):
+        return self
+
+    def update(self, **kwargs):
+        return self
+
+    def end(self, **kwargs):
+        return self
+
+
+_NOOP = _NoOpObservation()
+
+
+def tracing_enabled() -> bool:
+    """True when all three Langfuse variables are set. Warns once when only some of them are."""
+    global _warned_partial_config
+    missing = [name for name in LANGFUSE_ENV_VARS if not os.getenv(name)]
+    if not missing:
+        return True
+    if len(missing) < len(LANGFUSE_ENV_VARS) and not _warned_partial_config:
+        logger.warning("Langfuse tracing is off. Missing: %s", ", ".join(missing))
+        _warned_partial_config = True
+    return False
 
 
 def get_langfuse_client():
     global _client
     if _client is None:
+        from langfuse import Langfuse  # imported only when tracing is on
+
         _client = Langfuse(
             public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
             secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
@@ -31,7 +63,11 @@ def get_langfuse_client():
 
 @contextmanager
 def trace_conversation(user_id, message):
-    """Root trace for one WhatsApp message. Yields the trace for child logging."""
+    """Root trace for one WhatsApp message. Yields the trace, or a no-op stand-in when tracing is off."""
+    if not tracing_enabled():
+        yield _NOOP
+        return
+
     client = get_langfuse_client()
     trace = client.trace(
         name="whatsapp_conversation",
