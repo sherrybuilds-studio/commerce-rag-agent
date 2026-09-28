@@ -218,6 +218,7 @@ __marimo__/
 google_credentials.json
 chroma_db/
 cache.json
+cache.json.*.tmp
 agents/lead-generation/raw_leads.json
 agents/lead-generation/qualified_leads.json
 

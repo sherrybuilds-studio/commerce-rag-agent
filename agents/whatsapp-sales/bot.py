@@ -51,8 +51,12 @@ def get_ai_response(customer_message, conversation_history=None, user_id="anonym
         conversation_history = []
 
     with trace_conversation(user_id, customer_message) as trace:
-        # Step 1 — Check cache first (saves API costs)
-        cached, similarity = get_cached_answer(customer_message)
+        # Step 1 — Check cache first (saves API costs). A cache failure counts as a miss.
+        try:
+            cached, similarity = get_cached_answer(customer_message)
+        except Exception:
+            logger.exception("Cache lookup failed")
+            cached, similarity = None, None
         if cached is not None:
             log_cache_hit(trace, customer_message, cached, similarity)
             trace.update(output=cached)
@@ -122,8 +126,11 @@ def get_ai_response(customer_message, conversation_history=None, user_id="anonym
 
         log_llm_call(trace, "anthropic/claude-3.5-haiku", messages, reply, tokens)
 
-        # Step 4 — Cache the answer for future use
-        cache_answer(customer_message, reply)
+        # Step 4 — Cache the answer for future use. The reply goes out even if this fails.
+        try:
+            cache_answer(customer_message, reply)
+        except Exception:
+            logger.exception("Cache write failed")
 
         trace.update(output=reply)
         return reply
