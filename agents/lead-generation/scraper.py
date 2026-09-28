@@ -4,11 +4,12 @@ Scrapes property listing platforms for luxury residential listings.
 Filters: unfurnished only, target luxury residential market areas.
 """
 
-import requests
 import json
-import time
 import random
-from datetime import datetime
+import time
+from datetime import UTC, datetime
+
+import requests
 from bs4 import BeautifulSoup
 
 # Configure target areas and platform slugs for your market
@@ -57,7 +58,7 @@ def parse_price(price_text: str) -> int:
             return int(float(price_text.replace("k", "").strip()) * 1_000)
         else:
             return int(float(price_text))
-    except:
+    except (AttributeError, ValueError):
         return 0
 
 
@@ -129,10 +130,11 @@ def scrape_platform_1_area(area_slug: str) -> list:
                     "area":       area_slug,
                     "source":     "platform_1",
                     "url":        link,
-                    "scraped_at": datetime.now().isoformat(),
+                    "scraped_at": datetime.now(UTC).isoformat(),
                     "status":     "new",
                 })
-            except:
+            except (AttributeError, KeyError, TypeError, ValueError) as e:
+                print(f"  Skipped a listing card: {e}")
                 continue
 
         print(f"  Found {len(listings)} unfurnished listings in luxury residential market")
@@ -188,10 +190,11 @@ def scrape_platform_2_area(area_slug: str) -> list:
                     "area":       area_slug,
                     "source":     "platform_2",
                     "url":        link,
-                    "scraped_at": datetime.now().isoformat(),
+                    "scraped_at": datetime.now(UTC).isoformat(),
                     "status":     "new",
                 })
-            except:
+            except (AttributeError, KeyError, TypeError, ValueError) as e:
+                print(f"  Skipped a listing card: {e}")
                 continue
 
         print(f"  Found {len(listings)} unfurnished listings in luxury residential market")
@@ -205,10 +208,10 @@ def scrape_platform_2_area(area_slug: str) -> list:
 
 def run_scraper() -> list:
     """Run scraper across property listing platforms, return combined unique results."""
-    print(f"\nLead Scraper starting — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    print(f"Sources: property listing platforms")
-    print(f"Target market: luxury residential")
-    print(f"Furnished properties: EXCLUDED\n")
+    print(f"\nLead Scraper starting — {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M')}")
+    print("Sources: property listing platforms")
+    print("Target market: luxury residential")
+    print("Furnished properties: EXCLUDED\n")
 
     all_listings = []
 
@@ -223,13 +226,13 @@ def run_scraper() -> list:
     # Remove duplicates by URL
     seen_urls = set()
     unique    = []
-    for l in all_listings:
-        if l["url"] not in seen_urls:
-            seen_urls.add(l["url"])
-            unique.append(l)
+    for listing in all_listings:
+        if listing["url"] not in seen_urls:
+            seen_urls.add(listing["url"])
+            unique.append(listing)
 
-    platform_1_count = sum(1 for l in unique if l["source"] == "platform_1")
-    platform_2_count = sum(1 for l in unique if l["source"] == "platform_2")
+    platform_1_count = sum(1 for listing in unique if listing["source"] == "platform_1")
+    platform_2_count = sum(1 for listing in unique if listing["source"] == "platform_2")
 
     print(f"\nTotal unique listings: {len(unique)}")
     print(f"  Platform 1: {platform_1_count}")

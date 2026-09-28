@@ -3,11 +3,13 @@ agents/lead-generation/storage.py
 Saves qualified leads to Google Sheets automatically.
 """
 
-import os
 import json
-import gspread
-from google.oauth2.service_account import Credentials
+import os
 from datetime import datetime
+
+import gspread
+from google.auth.exceptions import GoogleAuthError
+from google.oauth2.service_account import Credentials
 
 SHEET_ID         = os.getenv("GOOGLE_SHEET_ID", "YOUR_SHEET_ID_HERE")
 CREDENTIALS_FILE = "agents/lead-generation/google_credentials.json"
@@ -53,7 +55,7 @@ def get_existing_urls(sheet) -> set:
     try:
         url_col = sheet.col_values(8)  # Column 8 = URL
         return set(url_col[1:])        # Skip header row
-    except:
+    except (gspread.exceptions.GSpreadException, OSError):
         return set()
 
 
@@ -72,7 +74,7 @@ def save_leads(leads: list) -> int:
                 continue
 
             row = [
-                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                datetime.now().astimezone().strftime("%Y-%m-%d %H:%M"),
                 lead["title"],
                 lead["price_text"],
                 lead["location"],
@@ -92,7 +94,8 @@ def save_leads(leads: list) -> int:
         print(f"\nGoogle Sheets updated — {new_count} new leads added.")
         return new_count
 
-    except Exception as e:
+    except (gspread.exceptions.GSpreadException, GoogleAuthError, OSError, ValueError) as e:
+        # Sheets API, auth, network or credentials-file error. qualified_leads.json is already written.
         print(f"Google Sheets error: {e}")
         return 0
 

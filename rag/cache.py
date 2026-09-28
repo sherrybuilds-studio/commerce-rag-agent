@@ -6,9 +6,10 @@ Similarity threshold: 95% — if question is this similar, return cached answer.
 
 import json
 import os
+from datetime import UTC, datetime
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from datetime import datetime
 
 CACHE_FILE = "rag/cache.json"
 THRESHOLD  = 0.95  # 95% similarity required to use cache
@@ -23,7 +24,7 @@ def load_cache() -> list:
     try:
         with open(CACHE_FILE, "r") as f:
             return json.load(f)
-    except:
+    except (OSError, ValueError):
         return []
 
 
@@ -75,7 +76,7 @@ def cache_answer(question: str, answer: str):
         "question":  question,
         "answer":    answer,
         "embedding": question_embedding,
-        "cached_at": datetime.now().isoformat(),
+        "cached_at": datetime.now(UTC).isoformat(),
         "hits":      0,
     })
 

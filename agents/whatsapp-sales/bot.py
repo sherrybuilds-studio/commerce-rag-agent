@@ -1,13 +1,16 @@
+import logging
 import os
+
 import requests
 from dotenv import load_dotenv
+
+from rag.cache import cache_answer, get_cached_answer
 from rag.retriever import retrieve
-from rag.cache import get_cached_answer, cache_answer
 from shared.observability import (
-    trace_conversation,
     log_cache_hit,
-    log_retrieval,
     log_llm_call,
+    log_retrieval,
+    trace_conversation,
 )
 
 GERMAN_WORDS = {
@@ -27,6 +30,8 @@ def detect_language(text: str) -> str:
         return "German"
     return "English"
 
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -56,8 +61,9 @@ def get_ai_response(customer_message, conversation_history=None, user_id="anonym
         # Step 2 — RAG retrieval
         try:
             relevant = retrieve(customer_message)
-        except Exception as e:
-            print(f"Retrieval error: {e}")
+        except Exception:
+            # Retrieval must never block a reply: answer without product context instead.
+            logger.exception("Retrieval failed")
             relevant = []
 
         log_retrieval(trace, customer_message, relevant)
@@ -107,8 +113,8 @@ def get_ai_response(customer_message, conversation_history=None, user_id="anonym
             result = response.json()
             reply = result["choices"][0]["message"]["content"]
             tokens = result.get("usage", {})
-        except Exception as e:
-            print(f"AI request failed: {e}")
+        except (requests.RequestException, ValueError, KeyError, IndexError, TypeError):
+            logger.exception("OpenRouter request failed")
             return (
                 "I'm sorry, I'm unable to respond right now. "
                 "Please try again in a moment."

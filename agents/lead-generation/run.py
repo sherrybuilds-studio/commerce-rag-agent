@@ -1,12 +1,13 @@
 import json
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from scraper import run_scraper
-from scorer import run_scorer
-from storage import save_leads
 from flask import Flask, jsonify
+from scorer import run_scorer
+from scraper import run_scraper
+from storage import save_leads
 
 app = Flask(__name__)
 
@@ -29,7 +30,7 @@ def run_pipeline():
         json.dump(qualified_leads, f, indent=2)
     # Step 4 — Save to Google Sheets
     new_leads = save_leads(qualified_leads)
-    print(f"\nPipeline complete.")
+    print("\nPipeline complete.")
     print(f"Total qualified leads: {len(qualified_leads)}")
     print(f"New leads added to Google Sheets: {new_leads}")
     print("=" * 50)

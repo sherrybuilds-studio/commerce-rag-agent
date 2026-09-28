@@ -1,6 +1,7 @@
 import json
-import shutil
 import os
+import shutil
+
 import chromadb
 from sentence_transformers import SentenceTransformer
 

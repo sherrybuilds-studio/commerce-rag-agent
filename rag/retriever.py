@@ -4,14 +4,18 @@ Semantic search finds meaning, keyword search finds exact matches.
 Both combined = more accurate product retrieval.
 """
 
-import os
 import json
+import logging
+import os
+
 import chromadb
 from sentence_transformers import SentenceTransformer
 
 _base         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH       = os.path.join(_base, "rag/chroma_db")
 PRODUCTS_PATH = os.path.join(_base, "rag/knowledge_base/products.json")
+
+logger = logging.getLogger(__name__)
 
 model      = SentenceTransformer("all-MiniLM-L6-v2")
 client     = chromadb.PersistentClient(path=DB_PATH)
@@ -96,8 +100,8 @@ def retrieve(query: str, n_results: int = 3) -> list:
     try:
         keyword_results  = keyword_search(query)
         semantic_results = semantic_search(query, n_results)
-    except Exception as e:
-        print(f"Retriever error: {e}")
+    except Exception:
+        logger.exception("Retrieval failed")
         return []
 
     seen  = set()

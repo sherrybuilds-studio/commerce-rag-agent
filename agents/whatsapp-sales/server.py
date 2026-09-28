@@ -5,10 +5,10 @@ Run: python3 agents/whatsapp-sales/server.py
 """
 
 import os
-import json
+
 import requests
-from flask import Flask, request, jsonify
 from dotenv import load_dotenv
+from flask import Flask, jsonify, request
 
 load_dotenv()
 

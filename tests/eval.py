@@ -4,11 +4,13 @@ Runs 10 gold standard questions and scores the bot.
 Run: python3 tests/eval.py
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.abspath("."))
 
 import importlib.util
+
 spec = importlib.util.spec_from_file_location(
     "bot", "agents/whatsapp-sales/bot.py"
 )

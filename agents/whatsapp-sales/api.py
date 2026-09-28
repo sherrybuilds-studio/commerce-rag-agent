@@ -6,13 +6,13 @@ Run: uvicorn agents.whatsapp-sales.api:app --reload
 """
 
 import os
-import json
+
 import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from dotenv import load_dotenv
+from slowapi.util import get_remote_address
 
 load_dotenv()
 
