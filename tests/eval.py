@@ -115,11 +115,11 @@ def run_evaluation():
     print("=" * 60)
 
     if final_score >= 80:
-        print("RESULT: PRODUCTION READY")
+        print("RESULT: PASS (80% or more)")
     elif final_score >= 60:
         print("RESULT: NEEDS IMPROVEMENT")
     else:
-        print("RESULT: NOT READY — review system prompt and product catalog")
+        print("RESULT: FAIL — review system prompt and product catalog")
 
 
 if __name__ == "__main__":
