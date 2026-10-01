@@ -10,6 +10,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -59,16 +60,16 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/webhook")
+@app.get("/webhook", response_class=PlainTextResponse)
 def verify_webhook(
     hub_mode: str = Query(..., alias="hub.mode"),
     hub_verify_token: str = Query(..., alias="hub.verify_token"),
     hub_challenge: str = Query(..., alias="hub.challenge")
 ):
-    """Meta calls this once to verify your webhook URL is real."""
-    if hub_mode == "subscribe" and hub_verify_token == META_VERIFY_TOKEN:
+    """Meta calls this once to verify your webhook URL is real. The body must be the bare challenge."""
+    if META_VERIFY_TOKEN and hub_mode == "subscribe" and hub_verify_token == META_VERIFY_TOKEN:
         print("Webhook verified by Meta")
-        return hub_challenge
+        return PlainTextResponse(hub_challenge)
     raise HTTPException(status_code=403, detail="Forbidden")
 
 
