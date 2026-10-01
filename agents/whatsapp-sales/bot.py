@@ -149,6 +149,7 @@ def get_ai_response(customer_message, conversation_history=None, user_id="anonym
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     print("Interior Brand AI Bot — Test Mode")
     print("Type 'quit' to exit\n")
     history = []
