@@ -4,13 +4,18 @@ Receives messages from Meta Cloud API and passes to bot.
 Run: python3 agents/whatsapp-sales/server.py
 """
 
+import logging
 import os
 
 import requests
+from bot import get_ai_response
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 META_TOKEN        = os.getenv("META_ACCESS_TOKEN")
 META_PHONE_ID     = os.getenv("META_PHONE_NUMBER_ID")
@@ -18,9 +23,12 @@ META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN")
 
 app = Flask(__name__)
 
-from bot import get_ai_response
-
 conversations = {}
+
+
+def mask_number(number: str) -> str:
+    """Last four digits only, so the logs hold no full customer phone numbers."""
+    return "..." + number[-4:]
 
 
 @app.route("/webhook", methods=["GET"])
@@ -31,7 +39,7 @@ def verify():
     challenge = request.args.get("hub.challenge")
 
     if mode == "subscribe" and token == META_VERIFY_TOKEN:
-        print("Webhook verified by Meta")
+        logger.info("Webhook verified by Meta")
         return challenge, 200
     return "Forbidden", 403
 
@@ -54,7 +62,7 @@ def receive_message():
 
         if msg_type == "text":
             user_text = message["text"]["body"]
-            print(f"Message from {from_number}: {user_text}")
+            logger.info("Text message from %s (%d characters)", mask_number(from_number), len(user_text))
 
             history = conversations.get(from_number, [])
             reply   = get_ai_response(user_text, history)
@@ -73,7 +81,7 @@ def receive_message():
                 "Could you tell me which style you're drawn to — modern, classic, or contemporary?")
 
     except (KeyError, IndexError) as e:
-        print(f"Error parsing webhook: {e}")
+        logger.warning("Ignoring a webhook payload without the expected field %s", e)
 
     return jsonify({"status": "ok"}), 200
 
@@ -93,9 +101,9 @@ def send_message(to: str, text: str):
     }
     resp = requests.post(url, headers=headers, json=payload, timeout=10)
     if resp.ok:
-        print(f"Sent to {to}: {text[:50]}...")
+        logger.info("Reply sent to %s", mask_number(to))
     else:
-        print(f"Send failed: {resp.text}")
+        logger.error("Sending to %s failed with HTTP %s: %s", mask_number(to), resp.status_code, resp.text[:300])
 
 
 if __name__ == "__main__":

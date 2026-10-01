@@ -1,13 +1,15 @@
 """
 Interior Brand — WhatsApp Webhook API (FastAPI)
-Replaces Flask with FastAPI for better performance and auto-docs.
+Receives WhatsApp messages from Meta's Cloud API, answers through bot.py and replies via the Graph API.
 
-Run: uvicorn agents.whatsapp-sales.api:app --reload
+Run from this folder: uvicorn api:app --port 5000
 """
 
+import logging
 import os
 
 import requests
+from bot import get_ai_response
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
@@ -16,6 +18,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 META_TOKEN        = os.getenv("META_ACCESS_TOKEN")
 META_PHONE_ID     = os.getenv("META_PHONE_NUMBER_ID")
@@ -49,7 +54,10 @@ def sanitize_input(text: str) -> str:
     return text
 
 
-from bot import get_ai_response
+def mask_number(number: str) -> str:
+    """Last four digits only, so the logs hold no full customer phone numbers."""
+    return "..." + number[-4:]
+
 
 conversations = {}
 
@@ -68,7 +76,7 @@ def verify_webhook(
 ):
     """Meta calls this once to verify your webhook URL is real. The body must be the bare challenge."""
     if META_VERIFY_TOKEN and hub_mode == "subscribe" and hub_verify_token == META_VERIFY_TOKEN:
-        print("Webhook verified by Meta")
+        logger.info("Webhook verified by Meta")
         return PlainTextResponse(hub_challenge)
     raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -90,10 +98,10 @@ def receive_message(request: Request, data: dict):
 
         if msg_type == "text":
             user_text = sanitize_input(message["text"]["body"])
-            print(f"Message from {from_number}: {user_text}")
+            logger.info("Text message from %s (%d characters)", mask_number(from_number), len(user_text))
 
             if user_text == "[blocked]":
-                print(f"Blocked prompt injection attempt from {from_number}")
+                logger.warning("Blocked a prompt-injection attempt from %s", mask_number(from_number))
                 return {"status": "ok"}
 
             history = conversations.get(from_number, [])
@@ -113,7 +121,7 @@ def receive_message(request: Request, data: dict):
                 "Could you tell me which style you're drawn to — modern, classic, or contemporary?")
 
     except (KeyError, IndexError) as e:
-        print(f"Error parsing webhook: {e}")
+        logger.warning("Ignoring a webhook payload without the expected field %s", e)
 
     return {"status": "ok"}
 
@@ -133,6 +141,6 @@ def send_message(to: str, text: str):
     }
     resp = requests.post(url, headers=headers, json=payload, timeout=10)
     if resp.ok:
-        print(f"Sent to {to}: {text[:50]}...")
+        logger.info("Reply sent to %s", mask_number(to))
     else:
-        print(f"Send failed: {resp.text}")
+        logger.error("Sending to %s failed with HTTP %s: %s", mask_number(to), resp.status_code, resp.text[:300])
