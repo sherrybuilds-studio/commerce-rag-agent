@@ -1,6 +1,7 @@
 """
-Interior Brand — WhatsApp Webhook Server
-Receives messages from Meta Cloud API and passes to bot.
+Interior Brand — WhatsApp Webhook Server (Flask)
+Receives messages from Meta Cloud API and passes to bot. Older baseline of api.py, without the rate
+limit and the injection filter. POST /webhook checks Meta's signature the same way api.py does.
 Run: python3 agents/whatsapp-sales/server.py
 """
 
@@ -11,6 +12,7 @@ import requests
 from bot import get_ai_response
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
+from meta_signature import SIGNATURE_HEADER, signature_is_valid
 
 load_dotenv()
 
@@ -20,6 +22,10 @@ logger = logging.getLogger(__name__)
 META_TOKEN        = os.getenv("META_ACCESS_TOKEN")
 META_PHONE_ID     = os.getenv("META_PHONE_NUMBER_ID")
 META_VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN")
+META_APP_SECRET   = os.getenv("META_APP_SECRET")
+
+if not META_APP_SECRET:
+    logger.warning("META_APP_SECRET is not set: POST /webhook will answer 503 until it is")
 
 app = Flask(__name__)
 
@@ -38,7 +44,7 @@ def verify():
     token     = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
 
-    if mode == "subscribe" and token == META_VERIFY_TOKEN:
+    if META_VERIFY_TOKEN and mode == "subscribe" and token == META_VERIFY_TOKEN:
         logger.info("Webhook verified by Meta")
         return challenge, 200
     return "Forbidden", 403
@@ -46,8 +52,17 @@ def verify():
 
 @app.route("/webhook", methods=["POST"])
 def receive_message():
-    """Meta sends every incoming WhatsApp message here."""
-    data = request.get_json()
+    """Meta sends every incoming WhatsApp message here. Only requests signed by Meta get through."""
+    if not META_APP_SECRET:
+        logger.error("Refused POST /webhook with 503: META_APP_SECRET is not set, so signatures cannot be checked")
+        return jsonify({"error": "Webhook signature check is not configured"}), 503
+    if not signature_is_valid(META_APP_SECRET, request.get_data(), request.headers.get(SIGNATURE_HEADER)):
+        logger.warning("Refused POST /webhook with 403: missing or wrong %s", SIGNATURE_HEADER)
+        return jsonify({"error": "Invalid signature"}), 403
+
+    data = request.get_json(force=True, silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Body is not a JSON object"}), 400
 
     try:
         entry   = data["entry"][0]

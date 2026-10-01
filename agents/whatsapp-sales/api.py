@@ -1,18 +1,22 @@
 """
 Interior Brand — WhatsApp Webhook API (FastAPI)
 Receives WhatsApp messages from Meta's Cloud API, answers through bot.py and replies via the Graph API.
+POST /webhook only accepts requests signed by Meta (X-Hub-Signature-256, keyed with META_APP_SECRET).
 
 Run from this folder: uvicorn api:app --port 5000
 """
 
+import json
 import logging
 import os
+from typing import Annotated
 
 import requests
 from bot import get_ai_response
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
+from meta_signature import SIGNATURE_HEADER, signature_is_valid
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -25,6 +29,10 @@ logger = logging.getLogger(__name__)
 META_TOKEN        = os.getenv("META_ACCESS_TOKEN")
 META_PHONE_ID     = os.getenv("META_PHONE_NUMBER_ID")
 META_VERIFY_TOKEN = os.getenv("WEBHOOK_VERIFY_TOKEN")
+META_APP_SECRET   = os.getenv("META_APP_SECRET")
+
+if not META_APP_SECRET:
+    logger.warning("META_APP_SECRET is not set: POST /webhook will answer 503 until it is")
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -81,9 +89,35 @@ def verify_webhook(
     raise HTTPException(status_code=403, detail="Forbidden")
 
 
+async def signed_payload(request: Request) -> dict:
+    """
+    The JSON body of a POST that Meta signed. Runs before the rate limit and the message handling.
+    503 while META_APP_SECRET is unset (fail closed), 403 on a missing or wrong signature.
+    """
+    if not META_APP_SECRET:
+        logger.error("Refused POST /webhook with 503: META_APP_SECRET is not set, so signatures cannot be checked")
+        raise HTTPException(status_code=503, detail="Webhook signature check is not configured")
+
+    body = await request.body()
+    if not signature_is_valid(META_APP_SECRET, body, request.headers.get(SIGNATURE_HEADER)):
+        logger.warning("Refused POST /webhook with 403: missing or wrong %s", SIGNATURE_HEADER)
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    try:
+        data = json.loads(body)
+    except ValueError:
+        data = None
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Body is not a JSON object")
+    return data
+
+
+SignedPayload = Annotated[dict, Depends(signed_payload)]
+
+
 @app.post("/webhook")
 @limiter.limit("10/minute")
-def receive_message(request: Request, data: dict):
+def receive_message(request: Request, data: SignedPayload):
     """Meta sends every incoming WhatsApp message here."""
     try:
         entry   = data["entry"][0]
