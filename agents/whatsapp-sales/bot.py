@@ -1,5 +1,17 @@
+"""
+agents/whatsapp-sales/bot.py: cache check, retrieval, LLM call, cache write.
+Terminal chat without WhatsApp: python3 agents/whatsapp-sales/bot.py
+"""
+
 import logging
 import os
+import sys
+
+# rag/ and shared/ live at the repo root. Put it on sys.path so this file also works as a script
+# and when the webhook starts from agents/whatsapp-sales (uvicorn api:app).
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
 import requests
 from dotenv import load_dotenv

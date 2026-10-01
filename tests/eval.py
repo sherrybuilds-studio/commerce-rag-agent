@@ -1,18 +1,16 @@
 """
 tests/eval.py — Bot Evaluation Framework
-Runs 10 gold standard questions and scores the bot.
+Runs 10 gold standard questions against the live model and scores the bot.
+Manual smoke test: needs OPENROUTER_API_KEY and a built index. pytest does not collect this file.
 Run: python3 tests/eval.py
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.abspath("."))
-
 import importlib.util
+import os
 
+_repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location(
-    "bot", "agents/whatsapp-sales/bot.py"
+    "bot", os.path.join(_repo_root, "agents", "whatsapp-sales", "bot.py")
 )
 bot_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(bot_module)
